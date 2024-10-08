@@ -1,7 +1,3 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
-"""Python example showcasing the usage of Bing Web Search API using REST calls"""
-
 import json
 from pprint import pprint
 
@@ -51,32 +47,6 @@ class BingWebSearch:
             print(ex)
             print("++The above exception was thrown and handled succesfully++")
             return response
-
-
-# def main() -> None:
-#     """Main Function that sends an example request and pretty prints the response"""
-#     # Load the environment variables from .env file
-#     env = dotenv.dotenv_values()
-
-#     # pylint: disable=invalid-name
-#     SUBSCRIPTION_KEY_ENV_VAR_NAME = "BING_SEARCH_V7_WEB_SEARCH_SUBSCRIPTION_KEY"
-
-#     # Add your Bing Web Search V7 subscription key to your environment variables / .env file
-#     subscription_key = env.get(SUBSCRIPTION_KEY_ENV_VAR_NAME)
-#     if not subscription_key:
-#         raise (
-#             RuntimeError(
-#                 f"Please define the {SUBSCRIPTION_KEY_ENV_VAR_NAME} environment variable"
-#             )
-#         )
-
-#     response = web_search_basic("Microsoft", subscription_key)
-#     print("\nResponse Headers:\n")
-#     pprint(dict(response.headers))
-
-#     print("\nJSON Response:\n")
-#     print(json.dumps(response.json(), indent=4))
-
 
 if __name__ == "__main__":
     pass

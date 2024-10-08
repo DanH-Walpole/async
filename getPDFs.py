@@ -34,7 +34,7 @@ import aiohttp
 # We need to do OAI request for each web page and ask "How does this page relate tot he question?" then we can combine the context of each page to make one big answer.
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +51,9 @@ class Inference:
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
         }
+        self.tokensUsedInput = 0  # Track tokens within the class
+        self.semaphore = asyncio.Semaphore(10)
+        self.lock = asyncio.Lock()  # Lock for thread safety
 
     def populatePageResponses(self):
         for page in self.pagesInMD:
@@ -66,6 +69,12 @@ class Inference:
                 pass
 
     def finalAnswer(self, searchResults="No results were found in the search"):
+
+        if len(self.pageRelevantResponses) == 0:
+            logger.error("No relevant pages found.")
+
+        logger.debug(f"Search results: {len(self.pageRelevantResponses)}")
+        logger.debug(f"Search results: {self.pageRelevantResponses}")
 
         preparedPrompt = f"""
 
@@ -126,6 +135,76 @@ class Inference:
             },
         )
         return response
+
+    async def populatePageResponsesAsync(self):
+        # List of async tasks for each page in Markdown format
+        tasks = [self.relevantPageResponseAsync(page) for page in self.pagesInMD]
+
+        # Run all tasks asynchronously and gather results
+        results = await asyncio.gather(*tasks)
+
+        for result in results:
+            if result and result.status == 200:
+                try:
+                    # Read the response content as text
+                    raw_content = await result.text()
+                    logger.debug(f"Raw response content: {raw_content}")
+
+                    # Attempt to parse it as JSON
+                    json_resp = await result.json()
+                    self.pageRelevantResponses.append(
+                        json_resp["choices"][0]["message"]["content"]
+                    )
+                except aiohttp.ClientConnectionError:
+                    logger.error("Error parsing JSON: Connection closed")
+                except Exception as e:
+                    logger.error(f"Error parsing JSON: {e}")
+            else:
+                logger.error(
+                    f"Error: Unable to process one of the pages (status code: {result.status if result else 'None'})"
+                )
+
+    async def relevantPageResponseAsync(
+        self, pageInMD="No details were available for the page"
+    ):
+        preparedPrompt = f"""
+        You are helping a user search the internet and answer a question. Here's the raw page formatted in markdown. Based on this data, generate a summary of why this question relates to the user's question. If it answers the user's question, provide the answer:
+
+        question: {self.question}
+
+        page content:
+        {pageInMD}
+        """
+
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.post(
+                    self.base_url,
+                    headers=self.headers,
+                    json={
+                        "messages": [
+                            {
+                                "role": "system",
+                                "content": "You helping to answer a query from a user. You are specifically good with searching the internet for results.",
+                                "role": "user",
+                                "content": preparedPrompt,
+                            }
+                        ],
+                        "model": "gpt-4o-mini",
+                        "temperature": 0.2,
+                    },
+                    timeout=aiohttp.ClientTimeout(total=60),  # 30 seconds timeout
+                ) as response:
+                    logger.info(f"Response status: {response.status}")
+                    logger.debug(f"Response content: {await response.text()}")
+
+                    return response
+            except aiohttp.ClientConnectionError as e:
+                logger.error(f"Connection error while processing page: {e}")
+                return None
+            except asyncio.TimeoutError:
+                logger.error(f"Request timed out for the page.")
+                return None
 
 
 class WebSearch:
@@ -237,6 +316,8 @@ class WebSearch:
 
     def convert_html_to_markdown(self, response: Response) -> str:
 
+        start_time = time()
+
         html_content = response.text
 
         # Create an html2text object
@@ -247,6 +328,8 @@ class WebSearch:
 
         # Convert the HTML content to Markdown
         markdown_content = h.handle(html_content)
+
+        logger.debug(f"Converted HTML to Markdown in {time() - start_time:.2f} seconds")
 
         return markdown_content
 
@@ -298,22 +381,40 @@ class WebSearch:
 
 if __name__ == "__main__":
 
-    webSearch = WebSearch()
-    myInference = Inference()
-    question = "How do I find Yuffie in Final Fantasy 7 Original?"
+    async def main():
 
-    myInference.base_url = "https://api.openai.com/v1/chat/completions"
+        start_time = time()
 
-    webSearch.searchAPI(question)
+        webSearch = WebSearch()
+        myInference = Inference()
+        question = "How do I find Vincent in Final Fantasy 7 Original?"
 
-    myInference.question = question
-    myInference.pagesInMD = webSearch.pagesContentsMD
+        myInference.base_url = "https://api.openai.com/v1/chat/completions"
 
-    myInference.populatePageResponses()
+        webSearch.searchAPI(question)
 
-    final_answer = myInference.finalAnswer()
+        myInference.question = question
+        myInference.pagesInMD = webSearch.pagesContentsMD
 
-    print(final_answer.json()["choices"][0]["message"]["content"])
+        start_time_inference = time()
+        await myInference.populatePageResponsesAsync()
+
+        final_answer = myInference.finalAnswer()
+        end_time_inference = time()
+
+        end_time = time()
+        total_time = end_time - start_time
+
+        # Print the final answer and the time taken
+        print(
+            f"""
+            Total time taken: {total_time:.2f} seconds\n
+            Time taken for inference: {end_time_inference - start_time_inference:.2f} seconds\n\n
+            Final Answer: {final_answer.json()["choices"][0]["message"]["content"]}
+            """
+        )
+
+    asyncio.run(main())
 
     # Stopping here for now to get the inference piece put together then turning back around to get the extra PDF info.
 
