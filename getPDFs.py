@@ -110,7 +110,7 @@ class Inference:
 
         preparedPrompt = f"""
 
-        You are helping a user search the internet and answer a question. Here's the raw page formatted in markdown. Based on this data, generate a summary of why this question relates to the user's question. If it answers the user's question, provide the answer:
+        You are helping a user search the internet and answer a question. Here's the raw page formatted in markdown. Based on this data, generate a summary of why this question relates to the user's question. If it answers the user's question, provide the answer and also mention the website it came from:
 
         question: {self.question}
 
@@ -233,13 +233,17 @@ class WebSearch:
             response = self.downloadURL(page["url"])
             if response and response.status_code == 200:
                 self.pagesContentsHTML.append(response)
-                self.pagesContentsMD.append(self.convert_html_to_markdown(response))
-            if response:
-                logger.error(f"Error: Unable to access {page['url']} status code: {response.status_code}")
-            else:
-                logger.error(
-                    f"Error: Unable to access {page['url']}"
+                self.pagesContentsMD.append(
+                    self.convert_html_to_markdown(
+                        pageHTML=response, pageURL=page["url"]
+                    )
                 )
+            if response:
+                logger.error(
+                    f"Error: Unable to access {page['url']} status code: {response.status_code}"
+                )
+            else:
+                logger.error(f"Error: Unable to access {page['url']}")
                 pass
 
     def getPdfChoices(self, responseObject) -> str:
@@ -324,11 +328,11 @@ class WebSearch:
                 f"Error: Unable to download PDF from {pdf_url} (status code: {response.status_code})"
             )
 
-    def convert_html_to_markdown(self, response: Response) -> str:
+    def convert_html_to_markdown(self, pageHTML: Response, pageURL: str) -> str:
 
         start_time = time()
 
-        html_content = response.text
+        html_content = pageHTML.text
 
         # Create an html2text object
         h = html2text.HTML2Text()
@@ -340,7 +344,7 @@ class WebSearch:
         h.skip_internal_links = True
 
         # Convert the HTML content to Markdown
-        markdown_content = h.handle(html_content)
+        markdown_content = f"source: {pageURL} \n{h.handle(html_content)}"
 
         logger.debug(f"Converted HTML to Markdown in {time() - start_time:.2f} seconds")
 
@@ -410,10 +414,10 @@ if __name__ == "__main__":
 
         webSearch = WebSearch()
         myInference = Inference()
-        question = "What is the top car in the united states right now?"
+        question = "How is Pal's like Arby's?"
 
         myInference.base_url = "https://api.openai.com/v1/chat/completions"
-        # myInference.base_url = "http://192.168.1.181:1234/v1/chat/completions"
+        myInference.base_url = "http://192.168.1.181:1234/v1/chat/completions"
 
         webSearch.searchAPI(question)
 

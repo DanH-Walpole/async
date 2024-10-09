@@ -35,7 +35,11 @@ class BingWebSearch:
 
         # Construct a request
         endpoint = "https://api.bing.microsoft.com/v7.0/search"
-        params = {"q": query, "mkt": mkt}
+        params = {
+            "q": query, 
+            "mkt": mkt,
+            "count": 3,
+            }
         headers = {auth_header_name: self.subscription_key}
 
         # Call the API
