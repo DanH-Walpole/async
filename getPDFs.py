@@ -41,10 +41,13 @@ logger = logging.getLogger(__name__)
 
 class Inference:
 
+    question: str
+    base_url: str = "http://localhost:1234/v1/chat/completions"
+
     def __init__(self):
-        self.base_url = "http://localhost:1234/v1/chat/completions"
+        # self.base_url = "http://localhost:1234/v1/chat/completions"
         self.api_key = os.getenv("OPENAI_API_KEY")
-        self.question = ""
+        # self.question = ""
         self.pagesInMD = []
         self.pageRelevantResponses = []
         self.headers = {
@@ -190,7 +193,7 @@ class Inference:
                                 "content": preparedPrompt,
                             }
                         ],
-                        "model": "gpt-4o-mini",
+                        "model": "gpt-4o-mini", # need to fix this to a parameter
                         "temperature": 0.2,
                     },
                     timeout=aiohttp.ClientTimeout(total=60),  # 30 seconds timeout
