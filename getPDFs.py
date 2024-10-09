@@ -231,12 +231,14 @@ class WebSearch:
     def populatePagesContents(self):
         for page in self.pages["webPages"]["value"]:
             response = self.downloadURL(page["url"])
-            if response.status_code == 200:
+            if response and response.status_code == 200:
                 self.pagesContentsHTML.append(response)
                 self.pagesContentsMD.append(self.convert_html_to_markdown(response))
+            if response:
+                logger.error(f"Error: Unable to access {page['url']} status code: {response.status_code}")
             else:
                 logger.error(
-                    f"Error: Unable to access {page['url']} (status code: {response.status_code})"
+                    f"Error: Unable to access {page['url']}"
                 )
                 pass
 
@@ -257,7 +259,15 @@ class WebSearch:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
         }
-        response = requests.get(url=url, headers=headers)
+        try:
+            response = requests.get(url=url, headers=headers, timeout=5)
+        except requests.Timeout:
+            logger.error(f"Timeout error while accessing {url}")
+            return None
+        except requests.RequestException as e:
+            logger.error(f"Error while accessing {url}: {e}")
+            return None
+
         return response
 
     def find_pdf_links(self, url):
@@ -325,6 +335,9 @@ class WebSearch:
 
         # Ignore converting links (optional)
         h.ignore_links = True
+        h.ignore_images = True
+        h.ignore_mailto_links = True
+        h.skip_internal_links = True
 
         # Convert the HTML content to Markdown
         markdown_content = h.handle(html_content)
@@ -379,6 +392,16 @@ class WebSearch:
         return text
 
 
+class DocumentHandler:
+
+    def __init__(self):
+        pass
+
+    def convertPDFToText(self, inputPDF):
+        for page in inputPDF:
+            text = page.get_text()
+
+
 if __name__ == "__main__":
 
     async def main():
@@ -387,9 +410,10 @@ if __name__ == "__main__":
 
         webSearch = WebSearch()
         myInference = Inference()
-        question = "How do I find Vincent in Final Fantasy 7 Original?"
+        question = "What is the top car in the united states right now?"
 
         myInference.base_url = "https://api.openai.com/v1/chat/completions"
+        # myInference.base_url = "http://192.168.1.181:1234/v1/chat/completions"
 
         webSearch.searchAPI(question)
 
