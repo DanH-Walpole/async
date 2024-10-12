@@ -18,6 +18,7 @@ import dotenv
 import os
 import asyncio
 import aiohttp
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 ## get PDFs from a page.
 
@@ -34,7 +35,7 @@ import aiohttp
 # We need to do OAI request for each web page and ask "How does this page relate tot he question?" then we can combine the context of each page to make one big answer.
 
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,9 @@ logger = logging.getLogger(__name__)
 class Inference:
 
     question: str
+    formattedQuestion: str
     base_url: str = "http://localhost:1234/v1/chat/completions"
+
 
     def __init__(self):
         # self.base_url = "http://localhost:1234/v1/chat/completions"
@@ -57,8 +60,14 @@ class Inference:
         self.tokensUsedInput = 0  # Track tokens within the class
         self.semaphore = asyncio.Semaphore(10)
         self.lock = asyncio.Lock()  # Lock for thread safety
+        
 
-    def populatePageResponses(self):
+    def setQuestion(self, question:str) -> None:
+        self.question = question
+        self.formattedQuestion = self.formatQuestion(self.question)
+        logger.debug(f"Formatted question: {self.formattedQuestion}")
+
+    def populatePageResponses(self) -> None:
         for page in self.pagesInMD:
             response = self.relevantPageResponse(page)
             if response.status_code == 200:
@@ -81,7 +90,7 @@ class Inference:
 
         preparedPrompt = f"""
 
-        You are helping a user search the internet and answer a question. Here are the results of their internet search. Only answer the questions based on the search results:
+        You are helping a user search the internet and answer a question. Here are the results of their internet search. Only answer the questions based on the search results. Mention the website if the answer came from a website.:
 
         Search results:
 
@@ -137,6 +146,38 @@ class Inference:
                 "temperature": 0.2,
             },
         )
+        return response
+    
+
+    def formatQuestion(self, question=""):
+
+        preparedPrompt = f"""
+
+        You are helping a user search the internet and answer a question. Here's the question from the user. Based on the question, can you reformat the question into a good query for a search engine? For example, if the user's question is "I am having trouble with my computer overheating. What should I do?" you could reformat it as "How to prevent computer overheating". Respond only with the reformatted question:
+
+        user's question: {question}
+
+        """
+
+        response = requests.post(
+            headers=self.headers,
+            url=self.base_url,
+            json={
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You helping to answer a query from a user. You are specifically good with searching the internet for results.",
+                        "role": "user",
+                        "content": preparedPrompt,
+                    }
+                ],
+                "model": "gpt-4o-mini",
+                "temperature": 0.2,
+            },
+        )
+
+        if response.status_code == 200:
+            return response.json()["choices"][0]["message"]["content"]
         return response
 
     async def populatePageResponsesAsync(self):
@@ -226,10 +267,47 @@ class WebSearch:
 
     def searchAPI(self, query):
         mySearch = BingWebSearch()
+
         response = mySearch.web_search_basic(query)
+        if response.status_code != 200:
+            logger.error(f"Error: Unable to access Bing Search API (status code: {response.status_code})")
+            return
         self.pages = response.json()
-        self.populatePagesContents()
+        start_time = time()
+        self.populatePagesContentsMulti()
+        logger.debug(f"Populated pages contents in {time() - start_time:.2f} seconds")
         pass
+
+    def populatePagesContentsMulti(self):
+
+        if not self.pages["webPages"]["value"]:
+            logger.error("No search results found.")
+            return
+
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = []
+
+            for page in self.pages["webPages"]["value"]:
+                # Download the page HTML and convert to markdown concurrently
+                future = executor.submit(self.processPageMulti, page)
+                futures.append(future)
+
+            # Wait for all futures to complete
+            for future in as_completed(futures):
+                try:
+                    page_markdown = future.result()
+                    self.pagesContentsMD.append(page_markdown)
+                except Exception as e:
+                    logger.error(f"Error processing page: {e}")
+
+    def processPageMulti(self, page):
+        response = self.downloadURL(page["url"])
+        if response and response.status_code == 200:
+            self.pagesContentsHTML.append(response)
+            return self.convert_html_to_markdown(pageHTML=response, pageURL=page["url"])
+        else:
+            logger.error(f"Error: Unable to access {page['url']}")
+            return None
 
     def populatePagesContents(self):
         for page in self.pages["webPages"]["value"]:
@@ -413,37 +491,41 @@ if __name__ == "__main__":
 
     async def main():
 
-        start_time = time()
+        while True:
+            start_time = time()
 
-        webSearch = WebSearch()
-        myInference = Inference()
-        question = "How is Pal's like Arby's?"
+            webSearch = WebSearch()
+            myInference = Inference()
+            myInference.base_url = "https://api.openai.com/v1/chat/completions"
+            # myInference.base_url = "http://192.168.1.181:1234/v1/chat/completions"
+            # question = "What are the opinions between amazon s3 and backblaze b2 on reddit?"
+            question = input("Enter a question: ")
 
-        myInference.base_url = "https://api.openai.com/v1/chat/completions"
-        myInference.base_url = "http://192.168.1.181:1234/v1/chat/completions"
+            if question:
+                myInference.setQuestion(question)
 
-        webSearch.searchAPI(question)
+            webSearch.searchAPI(myInference.formattedQuestion)
 
-        myInference.question = question
-        myInference.pagesInMD = webSearch.pagesContentsMD
+            myInference.question = question
+            myInference.pagesInMD = webSearch.pagesContentsMD
 
-        start_time_inference = time()
-        await myInference.populatePageResponsesAsync()
+            start_time_inference = time()
+            await myInference.populatePageResponsesAsync()
 
-        final_answer = myInference.finalAnswer()
-        end_time_inference = time()
+            final_answer = myInference.finalAnswer()
+            end_time_inference = time()
 
-        end_time = time()
-        total_time = end_time - start_time
+            end_time = time()
+            total_time = end_time - start_time
 
-        # Print the final answer and the time taken
-        print(
-            f"""
-            Total time taken: {total_time:.2f} seconds\n
-            Time taken for inference: {end_time_inference - start_time_inference:.2f} seconds\n\n
-            Final Answer: {final_answer.json()["choices"][0]["message"]["content"]}
-            """
-        )
+            # Print the final answer and the time taken
+            print(
+                f"""
+                Total time taken: {total_time:.2f} seconds\n
+                Time taken for inference: {end_time_inference - start_time_inference:.2f} seconds\n\n
+                Final Answer: {final_answer.json()["choices"][0]["message"]["content"]}
+                """
+            )
 
     asyncio.run(main())
 
