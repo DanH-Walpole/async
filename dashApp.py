@@ -34,7 +34,7 @@ app.layout = dbc.Container(
             style={"margin-top": "10px", "width": "100%"},
         ),
         html.P(id="formatted-results"),
-        html.H3(
+        html.P(
             f"",
             id="search-formatted",
             hidden=False,
@@ -52,13 +52,15 @@ app.layout = dbc.Container(
 @callback(
     Output("search-formatted", "children"),
     Input("search-button", "n_clicks"),
+    Input("search-input", "value"),
     prevent_initial_call=True,
 )
-def update_search_formatted(n_clicks):
+def update_search_formatted(n_clicks, search_input):
     print("n_clicks: ", n_clicks)
+    print("search_input: ", search_input)
     if n_clicks>0:
-        test = "Test for now"
-        return f"Output: {test}"
+        search_results = InputController().run(search_input)
+        return f"Output: {search_results}"
 
 if __name__ == "__main__":
     app.run(debug=True)
