@@ -6,26 +6,19 @@ import dash_bootstrap_components as dbc
 app = Dash(
     __name__,
     external_stylesheets=[dbc.themes.MINTY],
-    
     meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}],
-)
-
-search_formatted = ""
-
-color_mode_switch = html.Span(
-    [
-        dbc.Label(className="fa fa-moon", html_for="switch"),
-        dbc.Switch(
-            id="switch", value=True, className="d-inline-block ms-1", persistence=True
-        ),
-        dbc.Label(className="fa fa-sun", html_for="switch"),
-    ]
 )
 
 app.layout = dbc.Container(
     [
         html.H1("LLM Search"),
-        dbc.Input(placeholder="Enter a value to search...", type="text", value="", id="search-input"),
+        dbc.Input(
+            placeholder="Enter a value to search...",
+            type="text",
+            value="",
+            id="search-input",
+            style={"margin-top": "20px"},
+        ),
 
         dbc.Button(
             "Search",
@@ -33,34 +26,61 @@ app.layout = dbc.Container(
             color="primary",
             style={"margin-top": "10px", "width": "100%"},
         ),
-        html.P(id="formatted-results"),
-        html.P(
-            f"",
-            id="search-formatted",
-            hidden=False,
+        dcc.Loading(
+            id="loading",
+            type="default",
+            children=dcc.Markdown(
+                id="search-formatted",
+                children="Enter a query and click Search to see results here.",
+                style={
+                    "whiteSpace": "pre-wrap",
+                    "word-wrap": "break-word",
+                    "margin-top": "20px",
+                    # "background-color": "#f8f9fa",
+                    "padding": "20px",
+                    "border-radius": "5px",
+                    "overflow": "auto",
+                    "max-width": "100%", 
+                },
+            ),
         ),
     ],
+    fluid=True,
     style={
-        # "textAlign": "center",
-        # "width": "100%",
-        "margintop": "10",
-        "position": "absolute",
-        "top": "1",
+        "padding": "20px",
     },
 )
 
 @callback(
     Output("search-formatted", "children"),
-    Input("search-button", "n_clicks"),
-    Input("search-input", "value"),
+    [Input("search-button", "n_clicks"),
+     Input("search-input", "value")],
     prevent_initial_call=True,
 )
 def update_search_formatted(n_clicks, search_input):
-    print("n_clicks: ", n_clicks)
-    print("search_input: ", search_input)
-    if n_clicks>0:
-        search_results = InputController().run(search_input)
-        return f"Output: {search_results}"
+    if n_clicks and search_input.strip():
+        # Initialize the InputController and run the search
+        controller = InputController()
+        try:
+            search_results = controller.run(search_input)
+            
+            # Check if search_results is a string
+            if isinstance(search_results, str):
+                # Format the output with markdown syntax
+                markdown_content = f"```\n{search_results}\n```"
+            else:
+                # Handle unexpected types
+                markdown_content = "Unexpected result format."
+        except Exception as e:
+            # Handle exceptions and provide user feedback
+            markdown_content = f"An error occurred during the search: {str(e)}"
+        
+        return markdown_content
+
+    elif n_clicks:
+        return "Please enter a valid search query."
+    
+    return "No search performed yet."
 
 if __name__ == "__main__":
     app.run(debug=True)
