@@ -46,7 +46,6 @@ class Inference:
     formattedQuestion: str
     base_url: str = "http://localhost:1234/v1/chat/completions"
 
-
     def __init__(self):
         # self.base_url = "http://localhost:1234/v1/chat/completions"
         self.api_key = os.getenv("OPENAI_API_KEY")
@@ -60,9 +59,8 @@ class Inference:
         self.tokensUsedInput = 0  # Track tokens within the class
         self.semaphore = asyncio.Semaphore(10)
         self.lock = asyncio.Lock()  # Lock for thread safety
-        
 
-    def setQuestion(self, question:str) -> None:
+    def setQuestion(self, question: str) -> None:
         self.question = question
         self.formattedQuestion = self.formatQuestion(self.question)
         logger.debug(f"Formatted question: {self.formattedQuestion}")
@@ -147,7 +145,6 @@ class Inference:
             },
         )
         return response
-    
 
     def formatQuestion(self, question=""):
 
@@ -234,7 +231,7 @@ class Inference:
                                 "content": preparedPrompt,
                             }
                         ],
-                        "model": "gpt-4o-mini", # need to fix this to a parameter
+                        "model": "gpt-4o-mini",  # need to fix this to a parameter
                         "temperature": 0.2,
                     },
                     timeout=aiohttp.ClientTimeout(total=60),  # 30 seconds timeout
@@ -270,12 +267,19 @@ class WebSearch:
 
         response = mySearch.web_search_basic(query)
         if response.status_code != 200:
-            logger.error(f"Error: Unable to access Bing Search API (status code: {response.status_code})")
+            logger.error(
+                f"Error: Unable to access Bing Search API (status code: {response.status_code})"
+            )
             return
         self.pages = response.json()
         start_time = time()
-        self.populatePagesContentsMulti()
-        logger.debug(f"Populated pages contents in {time() - start_time:.2f} seconds")
+        if self.pages:
+            self.populatePagesContentsMulti()
+            logger.debug(
+                f"Populated pages contents in {time() - start_time:.2f} seconds"
+            )
+        else:
+            logger.error("No search results found.")
         pass
 
     def populatePagesContentsMulti(self):
@@ -487,7 +491,54 @@ class DocumentHandler:
             text = page.get_text()
 
 
+class InputController:
+
+    def run(self):
+        asyncio.run(self.main())
+
+    async def main(self):
+        while True:
+            start_time = time()
+
+            webSearch = WebSearch()
+            myInference = Inference()
+            myInference.base_url = "https://api.openai.com/v1/chat/completions"
+            # myInference.base_url = "http://192.168.1.181:1234/v1/chat/completions"
+            # question = "What are the opinions between amazon s3 and backblaze b2 on reddit?"
+            question = input("Enter a question: ")
+
+            if question:
+                myInference.setQuestion(question)
+
+            webSearch.searchAPI(myInference.formattedQuestion)
+
+            myInference.question = question
+            myInference.pagesInMD = webSearch.pagesContentsMD
+
+            start_time_inference = time()
+            await myInference.populatePageResponsesAsync()
+
+            final_answer = myInference.finalAnswer()
+            end_time_inference = time()
+
+            end_time = time()
+            total_time = end_time - start_time
+
+            # Print the final answer and the time taken
+            print(
+                f"""
+                Total time taken: {total_time:.2f} seconds\n
+                Time taken for inference: {end_time_inference - start_time_inference:.2f} seconds\n\n
+                Final Answer: {final_answer.json()["choices"][0]["message"]["content"]}
+                """
+            )
+
+
 if __name__ == "__main__":
+
+    InputController().run()
+
+    exit()
 
     async def main():
 
