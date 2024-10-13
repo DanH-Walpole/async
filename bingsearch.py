@@ -38,7 +38,7 @@ class BingWebSearch:
         params = {
             "q": query, 
             "mkt": mkt,
-            "count": 3,
+            "count": 8,
             }
         headers = {auth_header_name: self.subscription_key}
 
