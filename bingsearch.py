@@ -15,7 +15,7 @@ class BingWebSearch:
         self.subscription_key = env.get(self.SUBSCRIPTION_KEY_ENV_VAR_NAME)
 
     def web_search_basic(
-        self, query, auth_header_name="Ocp-Apim-Subscription-Key", mkt="en-us"
+        self, query, auth_header_name="Ocp-Apim-Subscription-Key", mkt="en-us", results_count=5
     ):
         """Bing Web Search Basic REST call
 
@@ -38,7 +38,7 @@ class BingWebSearch:
         params = {
             "q": query, 
             "mkt": mkt,
-            "count": 8,
+            "count": results_count,
             }
         headers = {auth_header_name: self.subscription_key}
 
@@ -48,6 +48,7 @@ class BingWebSearch:
             response.raise_for_status()
             return response
         except HTTPError as ex:
+            logger.error(f"HTTPError: {ex}")
             print(ex)
             print("++The above exception was thrown and handled succesfully++")
             return response
