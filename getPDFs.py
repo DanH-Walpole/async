@@ -35,7 +35,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # We need to do OAI request for each web page and ask "How does this page relate tot he question?" then we can combine the context of each page to make one big answer.
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +150,7 @@ class Inference:
 
         preparedPrompt = f"""
 
-        You are helping a user search the internet and answer a question. Here's the question from the user. Based on the question, can you reformat the question into a good query for a search engine? For example, if the user's question is "I am having trouble with my computer overheating. What should I do?" you could reformat it as "How to prevent computer overheating". Respond only with the reformatted question:
+        You are helping a user search the internet and answer a question. Here's the question from the user. Based on the question, can you reformat the question into a good query for a search engine? For example, if the user's question is "I am having trouble with my computer overheating. What should I do?" you could reformat it as "How to prevent computer overheating". Respond only with the reformatted question. Do not use the site keyword in the query:
 
         user's question: {question}
 
@@ -265,13 +265,19 @@ class WebSearch:
     def searchAPI(self, query):
         mySearch = BingWebSearch()
 
-        response = mySearch.web_search_basic(query)
+        response = mySearch.web_search_basic(query, results_count=5)
         if response.status_code != 200:
             logger.error(
                 f"Error: Unable to access Bing Search API (status code: {response.status_code})"
             )
             return
-        self.pages = response.json()
+        try:
+            self.pages = response.json()
+            logger.debug(f"Bing API Response: {json.dumps(self.pages, indent=2)}")
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON decode error: {e}")
+            self.pages = {}
+        
         start_time = time()
         if self.pages:
             self.populatePagesContentsMulti()
@@ -280,12 +286,20 @@ class WebSearch:
             )
         else:
             logger.error("No search results found.")
-        pass
+
 
     def populatePagesContentsMulti(self):
 
-        if not self.pages["webPages"]["value"]:
+        if not self.pages:
             logger.error("No search results found.")
+            return
+        
+        if "webPages" not in self.pages:
+            logger.error(f"'webPages' key not found in the API response: {self.pages}")
+            return
+        
+        if "value" not in self.pages["webPages"]:
+            logger.error(f"'value' key not found under 'webPages': {self.pages['webPages']}")
             return
 
         with ThreadPoolExecutor(max_workers=10) as executor:
@@ -493,10 +507,11 @@ class DocumentHandler:
 
 class InputController:
 
-    def run(self):
-        asyncio.run(self.main())
+    def run(self, question: str = None):
+        if question:
+            return asyncio.run(self.main(question))
 
-    async def main(self):
+    async def main(self, question: str = None) -> str :
         while True:
             start_time = time()
 
@@ -505,7 +520,6 @@ class InputController:
             myInference.base_url = "https://api.openai.com/v1/chat/completions"
             # myInference.base_url = "http://192.168.1.181:1234/v1/chat/completions"
             # question = "What are the opinions between amazon s3 and backblaze b2 on reddit?"
-            question = input("Enter a question: ")
 
             if question:
                 myInference.setQuestion(question)
@@ -533,10 +547,12 @@ class InputController:
                 """
             )
 
+            return final_answer.json()["choices"][0]["message"]["content"]
+
 
 if __name__ == "__main__":
 
-    InputController().run()
+    InputController().run(question="What are the opinions between amazon s3 and backblaze b2 on reddit?")
 
     exit()
 
