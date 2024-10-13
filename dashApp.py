@@ -1,4 +1,5 @@
 from dash import Dash, dcc, html, callback, Input, Output
+from getPDFs import Inference, WebSearch, InputController
 
 import dash_bootstrap_components as dbc
 
@@ -25,11 +26,7 @@ app.layout = dbc.Container(
     [
         html.H1("LLM Search"),
         dbc.Input(placeholder="Enter a value to search...", type="text", value="", id="search-input"),
-        html.H3(
-            f"Search formatted as: {search_formatted}",
-            id="search-formatted",
-            hidden=False,
-        ),
+
         dbc.Button(
             "Search",
             id="search-button",
@@ -37,6 +34,11 @@ app.layout = dbc.Container(
             style={"margin-top": "10px", "width": "100%"},
         ),
         html.P(id="formatted-results"),
+        html.H3(
+            f"",
+            id="search-formatted",
+            hidden=False,
+        ),
     ],
     style={
         # "textAlign": "center",
