@@ -1,5 +1,6 @@
 import json
 from pprint import pprint
+import logging
 
 import dotenv
 import requests
