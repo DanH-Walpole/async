@@ -11,45 +11,73 @@ app = Dash(
 
 app.layout = dbc.Container(
     [
-        html.H1("LLM Search"),
-        dbc.Input(
-            placeholder="Enter a value to search...",
-            type="text",
-            value="",
-            id="search-input",
-            style={"margin-top": "20px"},
+        dbc.Row(
+            dbc.Col(
+                html.H1("LLM Search"),
+                width={'size': 12, 'offset': 0},
+                className="text-center my-4",
+            )
         ),
-
-        dbc.Button(
-            "Search",
-            id="search-button",
-            color="primary",
-            style={"margin-top": "10px", "width": "100%"},
+        dbc.Row(
+            dbc.Col(
+                dbc.Input(
+                    placeholder="Enter a value to search...",
+                    type="text",
+                    value="",
+                    id="search-input",
+                    style={"margin-bottom": "10px"},
+                ),
+                width={'size': 8, 'offset': 2},
+                className="mb-3",
+            )
         ),
-        dcc.Loading(
-            id="loading",
-            type="default",
-            children=dcc.Markdown(
-                id="search-formatted",
-                children="Enter a query and click Search to see results here.",
-                style={
-                    "whiteSpace": "pre-wrap",
-                    "word-wrap": "break-word",
-                    "margin-top": "20px",
-                    # "background-color": "#f8f9fa",
-                    "padding": "20px",
-                    "border-radius": "5px",
-                    "overflow": "auto",
-                    "max-width": "100%", 
-                },
-            ),
+        dbc.Row(
+            dbc.Col(
+                dbc.Button(
+                    "Search",
+                    id="search-button",
+                    color="primary",
+                    style={"width": "100%"},
+                ),
+                width={'size': 8, 'offset': 2},
+                className="mb-4",
+            )
+        ),
+        dbc.Row(
+            dbc.Col(
+                dcc.Loading(
+                    id="loading",
+                    type="default",
+                    children=html.Div(
+                        dcc.Markdown(
+                            id="search-formatted",
+                            children="Enter a query and click Search to see results here.",
+                            className="markdown-container",
+                            style={
+                                "whiteSpace": "pre-wrap",          # Preserves newlines and spaces
+                                "background-color": "#f8f9fa",
+                                "padding": "20px",
+                                "border-radius": "5px",
+                                "overflow-wrap": "break-word",     # Ensures long words break
+                                "word-wrap": "break-word",         # Fallback for older browsers
+                                "word-break": "break-word",        # Another fallback
+                                "max-width": "100%",               # Ensures markdown doesn't exceed container
+                            },
+                        ),
+                        style={"overflow-x": "auto"},  # Allows internal horizontal scrolling if needed
+                    ),
+                ),
+                width={'size': 8, 'offset': 2},
+            )
         ),
     ],
-    fluid=True,
+    fluid=True,  # Makes the container responsive
     style={
         "padding": "20px",
+        "overflow-x": "hidden",  # Prevents horizontal scroll on the container
     },
 )
+
 
 @callback(
     Output("search-formatted", "children"),
@@ -67,10 +95,15 @@ def update_search_formatted(n_clicks, search_input):
             # Check if search_results is a string
             if isinstance(search_results, str):
                 # Format the output with markdown syntax
+                # Option 1: Use code block
                 markdown_content = f"```\n{search_results}\n```"
+                
+                # Option 2: Use bullet points or headers for better readability
+                # markdown_content = f"### Search Results\n\n{search_results.replace('\n', '\n\n')}"
             else:
                 # Handle unexpected types
                 markdown_content = "Unexpected result format."
+
         except Exception as e:
             # Handle exceptions and provide user feedback
             markdown_content = f"An error occurred during the search: {str(e)}"
@@ -81,6 +114,7 @@ def update_search_formatted(n_clicks, search_input):
         return "Please enter a valid search query."
     
     return "No search performed yet."
+
 
 if __name__ == "__main__":
     app.run(debug=True)
