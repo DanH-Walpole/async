@@ -19,6 +19,7 @@ import os
 import asyncio
 import aiohttp
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from cachingTools import RedisHelper
 
 ## get PDFs from a page.
 
@@ -509,15 +510,27 @@ class DocumentHandler:
 class InputController:
 
     question: str = ""
-    memoDict: dict = {}
 
-    def memoization(self) -> bool:
-        print(self.memoDict)
-        if self.question in self.memoDict:
-            return True
+    def __init__(self):
+        self.redis = RedisHelper()
+
+    def memoization(self) -> str:
+        """
+        Use Redis to cache cold questions.
+        """
+        try:
+            # Try to look up the question in Redis
+            returnObject = self.redis.lookup(key=self.question)
+            if returnObject:
+                return returnObject  # Return the cached result from Redis
+            else:
+                return None
+
+        except Exception as e:
+            logger.error(f"Error with memoization: {e}")
+            return None  # Ensure None is returned in case of an exception
 
     def run(self, question: str = None):
-
         try:
             self.question = question
         except Exception as e:
@@ -525,51 +538,52 @@ class InputController:
             return
 
         if self.question:
-
-            if self.memoization():
-                return self.memoDict[question]
+            # Check the Redis cache before running the inference
+            cached_result = self.memoization()
+            if cached_result:
+                logger.info(f"Returning cached result for '{question}' from Redis")
+                return cached_result  # Return cached result from Redis
             else:
+                # If no cache, run the main method and store the result in Redis
                 result = asyncio.run(self.main(question))
-                self.memoDict[question] = result
+                self.redis.store(key=self.question, value=result)
                 return result
 
     async def main(self, question: str = None) -> str:
-        while True:
-            start_time = time()
+        start_time = time()
 
-            webSearch = WebSearch()
-            myInference = Inference()
-            myInference.base_url = "https://api.openai.com/v1/chat/completions"
-            # myInference.base_url = "http://192.168.1.181:1234/v1/chat/completions"
-            # question = "What are the opinions between amazon s3 and backblaze b2 on reddit?"
+        webSearch = WebSearch()
+        myInference = Inference()
+        myInference.base_url = "https://api.openai.com/v1/chat/completions"
 
-            if question:
-                myInference.setQuestion(question)
+        if question:
+            myInference.setQuestion(question)
 
-            webSearch.searchAPI(myInference.formattedQuestion)
+        # Perform the web search and inference
+        webSearch.searchAPI(myInference.formattedQuestion)
+        myInference.question = question
+        myInference.pagesInMD = webSearch.pagesContentsMD
 
-            myInference.question = question
-            myInference.pagesInMD = webSearch.pagesContentsMD
+        start_time_inference = time()
+        await myInference.populatePageResponsesAsync()
 
-            start_time_inference = time()
-            await myInference.populatePageResponsesAsync()
+        final_answer = myInference.finalAnswer()
+        end_time_inference = time()
 
-            final_answer = myInference.finalAnswer()
-            end_time_inference = time()
+        total_time = time() - start_time
 
-            end_time = time()
-            total_time = end_time - start_time
+        # Print the final answer and the time taken
+        print(
+            f"""
+            Total time taken: {total_time:.2f} seconds
+            Time taken for inference: {end_time_inference - start_time_inference:.2f} seconds
 
-            # Print the final answer and the time taken
-            print(
-                f"""
-                Total time taken: {total_time:.2f} seconds\n
-                Time taken for inference: {end_time_inference - start_time_inference:.2f} seconds\n\n
-                Final Answer: {final_answer.json()["choices"][0]["message"]["content"]}
-                """
-            )
+            Final Answer: {final_answer.json()["choices"][0]["message"]["content"]}
+            """
+        )
 
-            return final_answer.json()["choices"][0]["message"]["content"]
+        # Return the final answer from the API response
+        return final_answer.json()["choices"][0]["message"]["content"]
 
 
 if __name__ == "__main__":
