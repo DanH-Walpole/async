@@ -88,7 +88,7 @@ class Inference:
 
         preparedPrompt = f"""
 
-        You are helping a user search the internet and answer a question. Here are the results of their internet search. Only answer the questions based on the search results. Mention the website if the answer came from a website.:
+        You are helping a user search the internet and answer a question. Here are the results of their internet search. Only answer the questions based on the search results. Mention the website if the answer came from a website. Format the answer in markdown:
 
         Search results:
 
