@@ -277,7 +277,7 @@ class WebSearch:
         except json.JSONDecodeError as e:
             logger.error(f"JSON decode error: {e}")
             self.pages = {}
-        
+
         start_time = time()
         if self.pages:
             self.populatePagesContentsMulti()
@@ -287,19 +287,20 @@ class WebSearch:
         else:
             logger.error("No search results found.")
 
-
     def populatePagesContentsMulti(self):
 
         if not self.pages:
             logger.error("No search results found.")
             return
-        
+
         if "webPages" not in self.pages:
             logger.error(f"'webPages' key not found in the API response: {self.pages}")
             return
-        
+
         if "value" not in self.pages["webPages"]:
-            logger.error(f"'value' key not found under 'webPages': {self.pages['webPages']}")
+            logger.error(
+                f"'value' key not found under 'webPages': {self.pages['webPages']}"
+            )
             return
 
         with ThreadPoolExecutor(max_workers=10) as executor:
@@ -507,11 +508,32 @@ class DocumentHandler:
 
 class InputController:
 
-    def run(self, question: str = None):
-        if question:
-            return asyncio.run(self.main(question))
+    question: str = ""
+    memoDict: dict = {}
 
-    async def main(self, question: str = None) -> str :
+    def memoization(self) -> bool:
+        print(self.memoDict)
+        if self.question in self.memoDict:
+            return True
+
+    def run(self, question: str = None):
+
+        try:
+            self.question = question
+        except Exception as e:
+            logger.error(f"Error with initializing question: {e}")
+            return
+
+        if self.question:
+
+            if self.memoization():
+                return self.memoDict[question]
+            else:
+                result = asyncio.run(self.main(question))
+                self.memoDict[question] = result
+                return result
+
+    async def main(self, question: str = None) -> str:
         while True:
             start_time = time()
 
@@ -552,7 +574,9 @@ class InputController:
 
 if __name__ == "__main__":
 
-    InputController().run(question="What are the opinions between amazon s3 and backblaze b2 on reddit?")
+    InputController().run(
+        question="What are the opinions between amazon s3 and backblaze b2 on reddit?"
+    )
 
     exit()
 

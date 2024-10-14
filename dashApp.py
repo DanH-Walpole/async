@@ -27,7 +27,7 @@ app.layout = dbc.Container(
                         ),
                         # The text that will hover over the image
                         html.H1(
-                            "reporter",
+                            "search",
                             className="text-center",
                             style={
                                 "color": "#f0f8ff",
@@ -101,10 +101,9 @@ app.layout = dbc.Container(
                         ),
                         style={
                             "overflow-x": "auto"
-                        },  # Allows internal horizontal scrolling if needed
+                        },  
                     ),
                 ),
-                # width={'size': 8, 'offset': 2},
             )
         ),
     ],
@@ -130,6 +129,7 @@ def update_search_button_outline(search_input):
         return False
     return True
 
+
 @callback(
     Output("search-formatted", "className"),
     Input("search-formatted", "children"),
@@ -138,7 +138,8 @@ def update_search_button_outline(search_input):
 def update_search_opacity(search_formatted):
     if len(search_formatted) > 0:
         return "markdown-container visible"
-    return "markdown-container invisible"  
+    return "markdown-container invisible"
+
 
 @callback(
     Output("search-formatted", "children"),
