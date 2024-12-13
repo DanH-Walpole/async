@@ -1,17 +1,33 @@
-from dash import Dash, dcc, html, callback, Input, Output, State
+from dash import Dash, dcc, html, callback, Input, Output, State, ClientsideFunction
 import dash_bootstrap_components as dbc
 from searchapp.core.inference.inference import Inference
 from searchapp.core.search.web import WebSearch
 from searchapp.api.controller import InputController
 
+# Initialize with both themes available
 app = Dash(
     __name__,
-    external_stylesheets=[dbc.themes.MINTY],
+    external_stylesheets=[dbc.themes.MINTY, dbc.themes.DARKLY],
     meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}],
 )
 
+# Create theme toggle button
+theme_toggle = dbc.Button(
+    "Toggle Theme",
+    id="theme-toggle",
+    color="secondary",
+    size="sm",
+    className="position-fixed top-0 end-0 m-2",
+    style={"zIndex": 1000},
+)
+
+# Store component for theme state
+theme_store = dcc.Store(id="theme-store", storage_type="local")
+
 app.layout = dbc.Container(
     [
+        theme_store,  # Add theme store
+        theme_toggle,  # Add theme toggle button
         dbc.Row(
             dbc.Col(
                 html.Div(
@@ -72,7 +88,11 @@ app.layout = dbc.Container(
                     id="search-button",
                     color="primary",
                     outline=True,
-                    style={"width": "100%"},
+                    style={
+                        "width": "100%",
+                        "border-color": "var(--bs-primary)",
+                        "color": "var(--bs-primary)",
+                    },
                 ),
                 className="mb-4",
             )
@@ -89,13 +109,14 @@ app.layout = dbc.Container(
                             className="markdown-container invisible",
                             style={
                                 "whiteSpace": "pre-wrap",  # Preserves newlines and spaces
-                                "background-color": "#434343",
                                 "padding": "20px",
                                 "border-radius": "5px",
                                 "overflow-wrap": "break-word",  # Ensures long words break
                                 "word-wrap": "break-word",  # Fallback for older browsers
                                 "word-break": "break-word",  # Another fallback
                                 "max-width": "100%",  # Ensures markdown doesn't exceed container
+                                "color": "var(--bs-body-color)",  # Use Bootstrap's theme-aware color
+                                "background-color": "var(--bs-secondary-bg)",  # Use Bootstrap's theme-aware background
                             },
                         ),
                         style={
@@ -165,6 +186,50 @@ def update_search_formatted(n_clicks, search_input):
         return "Please enter a valid search query."
 
     return "No search performed yet."
+
+# Theme switching callbacks
+@callback(
+    Output("theme-store", "data"),
+    Input("theme-toggle", "n_clicks"),
+    State("theme-store", "data"),
+)
+def toggle_theme(n_clicks, current_theme):
+    if n_clicks is None:
+        # Initial load - set default theme
+        return {"theme": "light"}
+    
+    # Toggle between light and dark
+    if current_theme is None or current_theme.get("theme") == "light":
+        return {"theme": "dark"}
+    return {"theme": "light"}
+
+# Update theme CSS
+app.clientside_callback(
+    """
+    function(theme_data) {
+        if (!theme_data) return;
+        
+        const theme = theme_data.theme;
+        const lightTheme = document.querySelector('link[href*="MINTY"]');
+        const darkTheme = document.querySelector('link[href*="DARKLY"]');
+        
+        if (theme === 'dark') {
+            lightTheme.disabled = true;
+            darkTheme.disabled = false;
+            document.body.style.backgroundColor = '#1a1a1a';
+            document.body.style.color = '#ffffff';
+        } else {
+            lightTheme.disabled = false;
+            darkTheme.disabled = true;
+            document.body.style.backgroundColor = '#ffffff';
+            document.body.style.color = '#000000';
+        }
+        return '';
+    }
+    """,
+    Output("theme-toggle", "style"),
+    Input("theme-store", "data"),
+)
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0")
