@@ -210,8 +210,8 @@ app.clientside_callback(
         if (!theme_data) return;
         
         const theme = theme_data.theme;
-        const lightTheme = document.querySelector('link[href*="MINTY"]');
-        const darkTheme = document.querySelector('link[href*="DARKLY"]');
+        const lightTheme = document.querySelector('link[href*="minty"]');
+        const darkTheme = document.querySelector('link[href*="darkly"]');
         
         if (theme === 'dark') {
             lightTheme.disabled = true;
