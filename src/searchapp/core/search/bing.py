@@ -1,12 +1,11 @@
 import json
-from pprint import pprint
 import logging
-
 import dotenv
 import requests
 from requests import HTTPError
-
 from time import sleep
+
+logger = logging.getLogger(__name__)
 
 class BingWebSearch:
 
@@ -53,6 +52,3 @@ class BingWebSearch:
             print(ex)
             print("++The above exception was thrown and handled succesfully++")
             return response
-
-if __name__ == "__main__":
-    pass

@@ -1,7 +1,8 @@
 from dash import Dash, dcc, html, callback, Input, Output, State
-from getPDFs import Inference, WebSearch, InputController
-
 import dash_bootstrap_components as dbc
+from searchapp.core.inference.inference import Inference
+from searchapp.core.search.web import WebSearch
+from searchapp.api.controller import InputController
 
 app = Dash(
     __name__,
@@ -60,7 +61,6 @@ app.layout = dbc.Container(
                         id="search-input",
                         style={"margin-bottom": "10px"},
                     ),
-                    # width={'size': 4, 'offset': 2},
                     className="mb-3",
                 )
             ]
@@ -74,7 +74,6 @@ app.layout = dbc.Container(
                     outline=True,
                     style={"width": "100%"},
                 ),
-                # width={'size': 8, 'offset': 2},
                 className="mb-4",
             )
         ),
@@ -111,13 +110,9 @@ app.layout = dbc.Container(
     style={
         "padding": "20px",
         "max-width": "800px",  # Limit the container width
-        # # "width": "100%",  # Set the container width
-        # "margin-left": "2vw",  # Center the container
-        # "margin-right": "2vw",  # Center the container
         "overflow-x": "hidden",  # Prevents horizontal scroll on the container
     },
 )
-
 
 @callback(
     Output("search-button", "outline"),
@@ -129,7 +124,6 @@ def update_search_button_outline(search_input):
         return False
     return True
 
-
 @callback(
     Output("search-formatted", "className"),
     Input("search-formatted", "children"),
@@ -139,7 +133,6 @@ def update_search_opacity(search_formatted):
     if len(search_formatted) > 0:
         return "markdown-container visible"
     return "markdown-container invisible"
-
 
 @callback(
     Output("search-formatted", "children"),
@@ -157,11 +150,7 @@ def update_search_formatted(n_clicks, search_input):
             # Check if search_results is a string
             if isinstance(search_results, str):
                 # Format the output with markdown syntax
-                # Option 1: Use code block
                 markdown_content = f"\n{search_results}\n"
-
-                # Option 2: Use bullet points or headers for better readability
-                # markdown_content = f"### Search Results\n\n{search_results.replace('\n', '\n\n')}"
             else:
                 # Handle unexpected types
                 markdown_content = "Unexpected result format."
@@ -176,7 +165,6 @@ def update_search_formatted(n_clicks, search_input):
         return "Please enter a valid search query."
 
     return "No search performed yet."
-
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0")

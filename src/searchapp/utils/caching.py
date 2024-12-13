@@ -1,9 +1,10 @@
 import redis
 import json
-import os
-from faker import Faker
 import time
 import logging
+from faker import Faker
+
+logger = logging.getLogger(__name__)
 
 class RedisHelper:
 
@@ -33,7 +34,7 @@ class RedisHelper:
         result = self.redis_client.get(key)
         time_taken_ms = (time.time() - start_time) * 1000
         # show the time taken to retrieve the key in milliseconds
-        logging.info(f"Time taken to retrieve key in ms: {time_taken_ms}")
+        logger.info(f"Time taken to retrieve key in ms: {time_taken_ms}")
         return result
     
     def exists(self, key: str) -> bool:
@@ -50,7 +51,7 @@ class RedisHelper:
 
     def flush(self):
         # Clears all keys in the Redis database (use with caution)
-        print("Flushing Redis database...")
+        logger.info("Flushing Redis database...")
         self.redis_client.flushdb()
 
     def populate_dummy_data(self, num_entries: int):
@@ -69,27 +70,4 @@ class RedisHelper:
             # Store the value as a JSON string
             self.store(key, json.dumps(value))
         
-        print(f"Inserted {num_entries} key-value pairs into Redis.")
-
-if __name__ == "__main__":
-    # Example usage
-    redis_helper = RedisHelper()
-
-    checkKey = "Can you tell me about Cloud Strife?"
-
-    # # Flush the Redis database before populating new data
-    # redis_helper.flush()
-
-    # # Populate Redis with 1,000,000 dummy key-value pairs
-    redis_helper.populate_dummy_data(1000000)
-
-    # Get and print the number of keys in Redis
-    print(f"Total number of keys: {redis_helper.get_size()}")
-
-    start_time = time.time()
-    result = redis_helper.lookup(key=checkKey)
-    if result:
-        print(f"Time taken to retrieve key: {time.time() - start_time}")
-        print(f"Value for {checkKey}: {result}")
-    else:
-        print("Key not found in Redis.")
+        logger.info(f"Inserted {num_entries} key-value pairs into Redis.")

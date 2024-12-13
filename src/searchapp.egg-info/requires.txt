@@ -1,0 +1,15 @@
+flask
+dash
+dash-bootstrap-components
+requests
+beautifulsoup4
+PyPDF2
+pdfminer
+pdfplumber
+pymupdf
+html2text
+python-dotenv
+redis
+faker
+aiohttp
+pydantic
