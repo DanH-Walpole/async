@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, jsonify
 import asyncio
-from getPDFs import Inference, WebSearch  # Assuming your getPDFs.py is in the same directory
+from searchapp.core.inference.inference import Inference
+from searchapp.core.search.web import WebSearch
 
 app = Flask(__name__)
 
@@ -42,4 +43,3 @@ async def handle_question(question):
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=4545)
-
